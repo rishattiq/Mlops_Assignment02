@@ -1,5 +1,3 @@
-
-
 import requests
 from bs4 import BeautifulSoup
 from airflow import DAG
@@ -13,23 +11,29 @@ sources = ['https://www.dawn.com/', 'https://www.bbc.com/']
 
 # Function to extract links from websites
 def extract_links(source_url):
-    reqs = requests.get(source_url)
-    soup = BeautifulSoup(reqs.text, 'html.parser')
-    links = []
-    for link in soup.find_all('a'):
-        links.append(link.get('href'))
-    return links
+    try:
+        reqs = requests.get(source_url)
+        soup = BeautifulSoup(reqs.text, 'html.parser')
+        links = [link.get('href') for link in soup.find_all('a', href=True)]
+        return links
+    except Exception as e:
+        print(f"Error extracting links from {source_url}: {e}")
+        return []
 
 # Function to extract titles and descriptions from articles
 def extract_articles(source_url):
-    reqs = requests.get(source_url)
-    soup = BeautifulSoup(reqs.text, 'html.parser')
-    articles = []
-    for article in soup.find_all('article'):
-        title = article.find('h1').text.strip()
-        description = article.find('p').text.strip()
-        articles.append({'title': title, 'description': description})
-    return articles
+    try:
+        reqs = requests.get(source_url)
+        soup = BeautifulSoup(reqs.text, 'html.parser')
+        articles = []
+        for article in soup.find_all('article'):
+            title = article.find('h1').text.strip() if article.find('h1') else "No title found"
+            description = article.find('p').text.strip() if article.find('p') else "No description found"
+            articles.append({'title': title, 'description': description})
+        return articles
+    except Exception as e:
+        print(f"Error extracting articles from {source_url}: {e}")
+        return []
 
 # Function for data transformation
 def transform():
@@ -88,7 +92,10 @@ task_extract_links >> task_extract_articles >> task_transform >> task_load
 
 # Task for DVC push
 def dvc_push():
-    os.system("dvc push")
+    try:
+        os.system("dvc push")
+    except Exception as e:
+        print(f"Error pushing to DVC: {e}")
 
 # Task to push data to DVC
 task_dvc_push = PythonOperator(
@@ -99,7 +106,10 @@ task_dvc_push = PythonOperator(
 
 # Task to version metadata against each DVC push
 def version_metadata():
-    call(["dvc", "commit", "-m", "Versioning metadata"])
+    try:
+        call(["dvc", "commit", "-m", "Versioning metadata"])
+    except Exception as e:
+        print(f"Error versioning metadata: {e}")
 
 # Task to version metadata against each DVC push
 task_version_metadata = PythonOperator(
